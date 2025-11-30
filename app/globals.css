@@ -156,4 +156,13 @@
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+  /* Add pointer-events: none so the pseudo-element doesn't block form inputs */
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ensure content inside gradient-border is clickable */
+.gradient-border > * {
+  position: relative;
+  z-index: 1;
 }
