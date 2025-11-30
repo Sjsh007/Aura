@@ -1,0 +1,113 @@
+version: '3.9'
+
+services:
+  aura-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://aura:aura_secret@postgres:5432/aura_db
+      - REDIS_URL=redis://redis:6379/0
+      - IPFS_API_URL=http://ipfs:5001
+      - CARDANO_NETWORK=preprod
+      - BLOCKFROST_PROJECT_ID=${BLOCKFROST_PROJECT_ID}
+      - LENDER_PRIVATE_KEY=${LENDER_PRIVATE_KEY}
+      - JWT_SECRET=${JWT_SECRET:-aura_jwt_secret_key_change_in_production}
+      - ENVIRONMENT=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ipfs:
+        condition: service_started
+    volumes:
+      - ./ml_models:/app/ml_models:ro
+    networks:
+      - aura-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: aura
+      POSTGRES_PASSWORD: aura_secret
+      POSTGRES_DB: aura_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aura -d aura_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aura-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aura-network
+
+  ipfs:
+    image: ipfs/kubo:latest
+    environment:
+      - IPFS_PROFILE=server
+    volumes:
+      - ipfs_data:/data/ipfs
+    ports:
+      - "5001:5001"
+      - "8080:8080"
+    networks:
+      - aura-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - aura-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aura-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  ipfs_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aura-network:
+    driver: bridge
