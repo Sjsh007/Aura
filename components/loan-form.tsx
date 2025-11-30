@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { LoanApplicationInput } from "@/lib/types"
 import { validateLoanApplication } from "@/lib/validation"
 import { useWallet } from "./wallet-provider"
@@ -13,10 +13,14 @@ import { SettlementPipeline } from "./settlement-pipeline"
 import { ProcessingLogs } from "./processing-logs"
 import { ProofDetails } from "./proof-details"
 import { useLoanPipeline } from "@/hooks/use-loan-pipeline"
+import { FormSkeleton } from "./loading-skeleton"
+import { SubmitButton } from "./submit-button"
 import { cn } from "@/lib/utils"
 
 export function LoanForm() {
   const { walletAddress, isConnected } = useWallet()
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<LoanApplicationInput>({
     fullName: "",
     email: "",
@@ -32,6 +36,13 @@ export function LoanForm() {
   const [viewStep, setViewStep] = useState<"form" | "processing" | "decision" | "disbursement">("form")
 
   const { state: pipelineState, result, logs, startPipeline, startDisbursement, retry, reset } = useLoanPipeline()
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitializing(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -64,7 +75,13 @@ export function LoanForm() {
       return
     }
 
+    setIsSubmitting(true)
+
+    await new Promise((r) => setTimeout(r, 1200))
+
     setViewStep("processing")
+    setIsSubmitting(false)
+
     await startPipeline(formData)
 
     if (result.loanDecision || pipelineState.completedStages.includes("lender_decision")) {
@@ -89,7 +106,7 @@ export function LoanForm() {
     reset()
     setViewStep("form")
     setFormData({
-      fullName: "Demo User",
+      fullName: "",
       email: "",
       monthlyIncome: 0,
       existingDebt: 0,
@@ -120,10 +137,13 @@ export function LoanForm() {
     )
   }
 
-  // Form step
+  if (isInitializing && viewStep === "form") {
+    return <FormSkeleton />
+  }
+
   if (viewStep === "form") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in duration-500">
         <StatusTracker step="form" pipelineState={pipelineState} />
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -136,7 +156,8 @@ export function LoanForm() {
               name="fullName"
               value={formData.fullName}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white placeholder-zinc-600 transition"
+              disabled={isSubmitting}
+              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white placeholder-zinc-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {errors.fullName && <p className="text-rose-400 text-xs mt-1">{errors.fullName}</p>}
           </div>
@@ -148,7 +169,8 @@ export function LoanForm() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 text-white placeholder-zinc-600 transition"
+              disabled={isSubmitting}
+              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 text-white placeholder-zinc-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {errors.email && <p className="text-rose-400 text-xs mt-1">{errors.email}</p>}
           </div>
@@ -161,7 +183,8 @@ export function LoanForm() {
                 name="monthlyIncome"
                 value={formData.monthlyIncome || ""}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white transition"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {errors.monthlyIncome && <p className="text-rose-400 text-xs mt-1">{errors.monthlyIncome}</p>}
             </div>
@@ -173,7 +196,8 @@ export function LoanForm() {
                 name="existingDebt"
                 value={formData.existingDebt || ""}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 text-white transition"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {errors.existingDebt && <p className="text-rose-400 text-xs mt-1">{errors.existingDebt}</p>}
             </div>
@@ -187,7 +211,8 @@ export function LoanForm() {
                 name="requestedAmount"
                 value={formData.requestedAmount || ""}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-white transition"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
               />
               {errors.requestedAmount && <p className="text-rose-400 text-xs mt-1">{errors.requestedAmount}</p>}
             </div>
@@ -198,7 +223,8 @@ export function LoanForm() {
                 name="tenureMonths"
                 value={formData.tenureMonths}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 text-white transition"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {[6, 12, 24, 36, 48, 60].map((m) => (
                   <option key={m} value={m} className="bg-[#1a1a2e]">
@@ -215,8 +241,9 @@ export function LoanForm() {
               name="purpose"
               value={formData.purpose}
               onChange={handleChange}
+              disabled={isSubmitting}
               placeholder="e.g., Business expansion, home improvement"
-              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white placeholder-zinc-600 transition"
+              className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white placeholder-zinc-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               rows={3}
             />
             {errors.purpose && <p className="text-rose-400 text-xs mt-1">{errors.purpose}</p>}
@@ -228,28 +255,25 @@ export function LoanForm() {
               name="hasRedFlags"
               checked={formData.hasRedFlags}
               onChange={handleChange}
-              className="rounded bg-white/10 border-white/20 text-violet-500 focus:ring-violet-500/50"
+              disabled={isSubmitting}
+              className="rounded bg-white/10 border-white/20 text-violet-500 focus:ring-violet-500/50 disabled:opacity-50"
             />
             <label className="text-sm text-zinc-400">I have credit/compliance red flags</label>
           </div>
 
           {errors.submit && <p className="text-rose-400 text-sm">{errors.submit}</p>}
 
-          <button
-            type="submit"
-            className="w-full px-4 py-3.5 bg-gradient-to-r from-cyan-500 via-violet-500 to-pink-500 hover:from-cyan-400 hover:via-violet-400 hover:to-pink-400 text-white font-semibold rounded-lg transition-all shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
-          >
+          <SubmitButton isLoading={isSubmitting} disabled={isSubmitting}>
             Submit Application
-          </button>
+          </SubmitButton>
         </form>
       </div>
     )
   }
 
-  // Processing step
   if (viewStep === "processing") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <StatusTracker step="processing" pipelineState={pipelineState} />
         <ProcessingPipeline state={pipelineState} onRetry={retry} />
         <ProcessingLogs logs={logs} />
@@ -257,18 +281,20 @@ export function LoanForm() {
     )
   }
 
-  // Decision step
   if (viewStep === "decision" && result.loanDecision) {
     const { loanDecision, proof, auraAssessment } = result
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <StatusTracker step="decision" pipelineState={pipelineState} />
 
         {proof && <ProofDetails proof={proof} />}
 
         {auraAssessment && (
-          <div className="gradient-border overflow-hidden">
+          <div
+            className="gradient-border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+            style={{ animationDelay: "100ms" }}
+          >
             <div className="bg-[#12121f]">
               <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">Risk Assessment</h3>
@@ -330,11 +356,12 @@ export function LoanForm() {
 
         <div
           className={cn(
-            "rounded-xl border overflow-hidden",
+            "rounded-xl border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300",
             loanDecision.status === "APPROVED" && "bg-emerald-500/10 border-emerald-500/30",
             loanDecision.status === "CONDITIONAL" && "bg-amber-500/10 border-amber-500/30",
             loanDecision.status === "REJECTED" && "bg-rose-500/10 border-rose-500/30",
           )}
+          style={{ animationDelay: "200ms" }}
         >
           <div
             className={cn(
@@ -403,7 +430,10 @@ export function LoanForm() {
         </div>
 
         {loanDecision.status !== "REJECTED" && (
-          <div className="gradient-border overflow-hidden">
+          <div
+            className="gradient-border overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+            style={{ animationDelay: "300ms" }}
+          >
             <div className="bg-[#12121f]">
               <div className="px-4 py-3 bg-white/5 border-b border-white/10">
                 <h3 className="text-sm font-semibold text-white">Loan Terms</h3>
@@ -433,47 +463,31 @@ export function LoanForm() {
         {loanDecision.status !== "REJECTED" && (
           <>
             <SettlementInfo />
-            <button
-              onClick={handleDisbursement}
-              className="w-full px-4 py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white font-semibold rounded-lg transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
-            >
+            <SubmitButton onClick={handleDisbursement} variant="success">
               Confirm & Disburse to Wallet
-            </button>
+            </SubmitButton>
           </>
         )}
 
         {loanDecision.status === "REJECTED" && (
-          <button
-            onClick={handleReset}
-            className="w-full px-4 py-3.5 bg-white/10 hover:bg-white/20 text-white font-medium rounded-lg transition border border-white/10"
-          >
+          <SubmitButton onClick={handleReset} variant="secondary">
             Start New Application
-          </button>
+          </SubmitButton>
         )}
       </div>
     )
   }
 
-  // Disbursement step
   if (viewStep === "disbursement") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <StatusTracker step="disbursement" pipelineState={pipelineState} />
-        <SettlementPipeline
-          state={pipelineState}
-          txHash={result.txHash}
-          disbursement={result.disbursement}
-          onRetry={() => startDisbursement(walletAddress!)}
-        />
+        <SettlementPipeline state={pipelineState} txHash={result.txHash} disbursement={result.disbursement} />
         <ProcessingLogs logs={logs} />
-
-        {result.txHash && (
-          <button
-            onClick={handleReset}
-            className="w-full px-4 py-3.5 bg-gradient-to-r from-cyan-500 via-violet-500 to-pink-500 hover:from-cyan-400 hover:via-violet-400 hover:to-pink-400 text-white font-semibold rounded-lg transition-all shadow-lg shadow-violet-500/25"
-          >
+        {pipelineState.completedStages.includes("settlement_confirmed") && (
+          <SubmitButton onClick={handleReset} variant="secondary">
             Start New Application
-          </button>
+          </SubmitButton>
         )}
       </div>
     )
